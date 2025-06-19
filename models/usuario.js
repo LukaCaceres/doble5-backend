@@ -1,5 +1,4 @@
 const Carrito = require('./carrito');
-const Favorito = require('./favorito');
 const { Schema, model } = require('mongoose');
 
 
@@ -8,13 +7,12 @@ const UsuarioSchema = Schema({
     correo: { type: String, required: [true, 'El correo es obligatorio'], unique: true },
     password: { type: String, required: [true, 'El contraseña es obligatoria'] },
     carrito: { type: Schema.Types.ObjectId, ref: 'Carrito' },
-    favorito: { type: Schema.Types.ObjectId, ref: 'Favorito' },
     rol: { type: String, required: true, default: 'USER_ROLE' },
     estado: { type: Boolean, default: true },
     resetToken: { type: String, default: "" }
 });
 
-// Hook pre-save para crear y asignar carrito y favoritos solo en la creación del usuario
+// Hook pre-save para crear y asignar carrito solo en la creación del usuario
 UsuarioSchema.pre('save', async function (next) {
     if (this.isNew) {
         try {
