@@ -28,18 +28,18 @@ class Server {
     }
 
     middlewares() { 
-        // Configurar CORS para permitir solo ciertos orígenes
+        
         this.app.use(cors({
-            origin: ['http://localhost:5173', 'https://clancydevsign.netlify.app'], // Lista de orígenes permitidos
+            origin: ['http://localhost:3000', process.env.FRONTEND_URL], // Lista de orígenes permitidos
             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
             allowedHeaders: ['Content-Type', 'Authorization', "x-token"],
             credentials: true, 
         }));
 
-        // Leer lo que envía el usuario por el body de la petición
+        
         this.app.use(express.json());
 
-        // Definir la carpeta pública que creamos
+        
         this.app.use(express.static('public'));
     }
 
