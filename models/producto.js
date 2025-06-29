@@ -8,7 +8,10 @@ const ProductoSchema = Schema({
         { type: String }
     ],
     activo: { type: Boolean, default: true },
-    destacado: { type: Boolean, default: false }
+    destacado: { type: Boolean, default: false },
+    talles: [
+        { type: String, required: [true, 'El talle es obligatorio'] }
+    ]
 })
 
 module.exports = model('Producto', ProductoSchema) 
