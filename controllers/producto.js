@@ -36,7 +36,7 @@ const obtenerProductosDestacados = async (req, res) => {
 
 // Crear un nuevo producto
 const productoPOST = async (req = request, res = response) => {
-    const { nombre, descripcion, categoria, precio, imagenes } = req.body;
+    const { nombre, descripcion, categoria, precio, imagenes, talles } = req.body;
 
     try {
         // Verificar si ya existe un producto con el mismo nombre
@@ -53,7 +53,8 @@ const productoPOST = async (req = request, res = response) => {
             descripcion,
             categoria: categoria.toUpperCase(),
             precio,
-            imagenes
+            imagenes,
+            talles
         });
 
         // Guardar en la base de datos
@@ -132,6 +133,9 @@ const productoPUT = async (req = request, res = response) => {
     }
     if (data.categoria) {
         data.categoria = data.categoria.toUpperCase();
+    }
+    if(data.talles){
+        data.talles = data.talles.toUpperCase();
     }
 
     try {
