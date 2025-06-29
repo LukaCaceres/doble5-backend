@@ -52,16 +52,11 @@ router.delete('/:id', [
 // Obtener el usuario logueado (por su token)
 router.get('/perfil', [
     validarJWT
-], async (req, res) => {
+], (req, res) => {
     try {
-        const usuario = await require('../models/usuario').findById(req.uid);
-        if (!usuario) return res.status(404).json({ msg: 'Usuario no encontrado' });
-
-        res.json({
-            nombre: usuario.nombre,
-            correo: usuario.correo,
-            rol: usuario.rol
-        });
+        // req.usuario ya viene seteado en el middleware validarJWT
+        const { nombre, correo, rol } = req.usuario;
+        res.json({ nombre, correo, rol });
     } catch (error) {
         console.error('Error obteniendo perfil:', error);
         res.status(500).json({ msg: 'Error al obtener el usuario' });
