@@ -16,6 +16,12 @@ router.post('/', [
     validarCampos
 ], usuarioPOST);
 
+
+// Obtener todos los usuarios (Solo admin)
+router.get('/', [
+    validarJWT,
+    esAdminRol
+], usuariosGET);
 // Obtener el usuario logueado (por su token)
 router.get('/perfil', [
     validarJWT
@@ -29,12 +35,6 @@ router.get('/perfil', [
         res.status(500).json({ msg: 'Error al obtener el usuario' });
     }
 });
-// Obtener todos los usuarios (Solo admin)
-router.get('/', [
-    validarJWT,
-    esAdminRol
-], usuariosGET);
-
 // Obtener un usuario por ID (Solo admin)
 router.get('/:id', [
     validarJWT,
