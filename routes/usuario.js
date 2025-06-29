@@ -16,6 +16,19 @@ router.post('/', [
     validarCampos
 ], usuarioPOST);
 
+// Obtener el usuario logueado (por su token)
+router.get('/perfil', [
+    validarJWT
+], (req, res) => {
+    try {
+        // req.usuario ya viene seteado en el middleware validarJWT
+        const { nombre, correo, rol } = req.usuario;
+        res.json({ nombre, correo, rol });
+    } catch (error) {
+        console.error('Error obteniendo perfil:', error);
+        res.status(500).json({ msg: 'Error al obtener el usuario' });
+    }
+});
 // Obtener todos los usuarios (Solo admin)
 router.get('/', [
     validarJWT,
@@ -49,19 +62,7 @@ router.delete('/:id', [
     validarCampos
 ], usuarioDELETE);
 
-// Obtener el usuario logueado (por su token)
-router.get('/perfil', [
-    validarJWT
-], (req, res) => {
-    try {
-        // req.usuario ya viene seteado en el middleware validarJWT
-        const { nombre, correo, rol } = req.usuario;
-        res.json({ nombre, correo, rol });
-    } catch (error) {
-        console.error('Error obteniendo perfil:', error);
-        res.status(500).json({ msg: 'Error al obtener el usuario' });
-    }
-});
+
 
 
 module.exports = router;
