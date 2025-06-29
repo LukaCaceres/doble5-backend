@@ -88,13 +88,19 @@ exports.procesarWebhook = async (req, res) => {
 
             if (orden && status === 'approved') {
                 // Vaciar el carrito del usuario
-                await Carrito.findOneAndUpdate(
-                    { usuario: orden.usuario },
-                    { productos: [] }
-                );
+                await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
+
+                // Descontar stock
+                for (const item of orden.productos) {
+                    await Producto.findOneAndUpdate(
+                        { nombre: item.titulo, 'talles.talle': item.talle },
+                        { $inc: { 'talles.$.stock': -item.cantidad } }
+                    );
+                }
 
                 console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado.`);
             }
+
 
             console.log('🧾 Orden actualizada:', orden);
         }

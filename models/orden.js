@@ -7,9 +7,11 @@ const ordenSchema = new mongoose.Schema({
         {
             titulo: String,
             cantidad: Number,
-            precio_unitario: Number
+            precio_unitario: Number,
+            talle: String // <--- NUEVO
         }
     ],
+
     comprador: {
         email: String
     },
