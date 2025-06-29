@@ -20,7 +20,7 @@ const carritoGET = async (req = request, res = response) => {
 
 // Agregar producto al carrito (POST)
 const carritoPOST = async (req = request, res = response) => {
-    const { productoId, cantidad } = req.body;
+    const { productoId, cantidad, talle } = req.body;
     const usuarioId = req.usuario._id;
 
     try {
@@ -31,7 +31,8 @@ const carritoPOST = async (req = request, res = response) => {
         }
 
         // Agregar el producto al carrito
-        carrito.productos.push({ producto: productoId, cantidad });
+        carrito.productos.push({ producto: productoId, cantidad, talle });
+
 
         // Guardar el carrito actualizado
         await carrito.save();
@@ -54,8 +55,11 @@ const carritoActualizarCantidad = async (req = request, res = response) => {
         }
 
         // Buscar el producto en el carrito
-        const productoEnCarrito = carrito.productos.find(p => p.producto.toString() === productoId);
-        
+        const productoEnCarrito = carrito.productos.find(
+            p => p.producto.toString() === productoId && p.talle === talle
+        );
+
+
         if (!productoEnCarrito) {
             return res.status(404).json({ msg: 'Producto no encontrado en el carrito' });
         }
@@ -93,7 +97,7 @@ const carritoPUT = async (req = request, res = response) => {
 
         // Filtrar el producto del carrito
         carrito.productos = carrito.productos.filter(p => p.producto.toString() !== productoId);
-        
+
         // Guardar el carrito actualizado
         await carrito.save();
 

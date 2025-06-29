@@ -38,8 +38,11 @@ const obtenerProductosDestacados = async (req, res) => {
 const productoPOST = async (req = request, res = response) => {
     const { nombre, descripcion, categoria, precio, imagenes, talles } = req.body;
 
+    if (!Array.isArray(talles) || !talles.every(t => t.talle && typeof t.stock === 'number')) {
+        return res.status(400).json({ msg: 'Los talles deben tener estructura { talle, stock }' });
+    }
+
     try {
-        // Verificar si ya existe un producto con el mismo nombre
         const productoExistente = await Producto.findOne({ nombre: nombre.toUpperCase() });
         if (productoExistente) {
             return res.status(400).json({
@@ -47,17 +50,20 @@ const productoPOST = async (req = request, res = response) => {
             });
         }
 
-        // Crear el producto con los datos enviados
+        const tallesNormalizados = talles.map(t => ({
+            talle: t.talle.toUpperCase(),
+            stock: t.stock
+        }));
+
         const producto = new Producto({
             nombre: nombre.toUpperCase(),
             descripcion,
             categoria: categoria.toUpperCase(),
             precio,
             imagenes,
-            talles
+            talles: tallesNormalizados
         });
 
-        // Guardar en la base de datos
         await producto.save();
 
         res.status(201).json({
@@ -124,6 +130,7 @@ const productoGET = async (req = request, res = response) => {
 };
 
 // Actualizar un producto
+// Actualizar un producto
 const productoPUT = async (req = request, res = response) => {
     const { id } = req.params;
     const { ...data } = req.body;
@@ -131,11 +138,14 @@ const productoPUT = async (req = request, res = response) => {
     if (data.nombre) {
         data.nombre = data.nombre.toUpperCase();
     }
+
     if (data.categoria) {
         data.categoria = data.categoria.toUpperCase();
     }
-    if(data.talles){
-        data.talles = data.talles.toUpperCase();
+
+    // Validación opcional de talles
+    if (data.talles && (!Array.isArray(data.talles) || !data.talles.every(t => t.talle && typeof t.stock === 'number'))) {
+        return res.status(400).json({ msg: 'Los talles deben tener estructura { talle, stock }' });
     }
 
     try {
@@ -153,6 +163,7 @@ const productoPUT = async (req = request, res = response) => {
         res.status(500).json({ msg: 'Error al actualizar el producto' });
     }
 };
+
 
 // Eliminar un producto (Soft Delete)
 const productoDELETE = async (req = request, res = response) => {
