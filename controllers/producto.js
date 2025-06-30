@@ -82,8 +82,8 @@ const productosGET = async (req = request, res = response) => {
         query = '',
         limite = 8,
         desde = 0,
-        categoria,
-        talles,
+        categoria,  // string simple
+        talle,      // string simple
         precioMin,
         precioMax,
         orden
@@ -100,20 +100,14 @@ const productosGET = async (req = request, res = response) => {
         ];
     }
 
-    // Filtro por categorías exactas
+    // Filtro por categoría (solo un string)
     if (categoria) {
-        const categoriasArray = Array.isArray(categoria)
-            ? categoria
-            : categoria.split(',');
-        searchQuery.categoria = { $in: categoriasArray.map(c => c.toUpperCase()) };
+        searchQuery.categoria = categoria.toUpperCase();
     }
 
-    // Filtro por talles
-    if (talles) {
-        const tallesArray = Array.isArray(talles)
-            ? talles
-            : talles.split(',');
-        searchQuery['talles.talle'] = { $in: tallesArray.map(t => t.toUpperCase()) };
+    // Filtro por talle (solo un string)
+    if (talle) {
+        searchQuery['talles.talle'] = talle.toUpperCase();
     }
 
     // Filtro por precio
