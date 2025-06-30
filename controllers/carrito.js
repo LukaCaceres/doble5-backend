@@ -45,7 +45,7 @@ const carritoPOST = async (req = request, res = response) => {
 
 // Actualizar cantidad de producto en el carrito (PUT)
 const carritoActualizarCantidad = async (req = request, res = response) => {
-    const { productoId, cantidad } = req.body;
+    const { productoId, cantidad, talle } = req.body;
     const usuarioId = req.usuario._id;
 
     try {
@@ -54,59 +54,52 @@ const carritoActualizarCantidad = async (req = request, res = response) => {
             return res.status(404).json({ msg: 'El carrito no existe' });
         }
 
-        // Buscar el producto en el carrito
         const productoEnCarrito = carrito.productos.find(
             p => p.producto.toString() === productoId && p.talle === talle
         );
-
 
         if (!productoEnCarrito) {
             return res.status(404).json({ msg: 'Producto no encontrado en el carrito' });
         }
 
-        // Actualizar la cantidad del producto
-        productoEnCarrito.cantidad += cantidad;
+        productoEnCarrito.cantidad = cantidad;
 
-        // Si la cantidad es menor o igual a 0, eliminar el producto del carrito
         if (productoEnCarrito.cantidad <= 0) {
-            carrito.productos = carrito.productos.filter(p => p.producto.toString() !== productoId);
+            carrito.productos = carrito.productos.filter(
+                p => !(p.producto.toString() === productoId && p.talle === talle)
+            );
         }
 
-        // Guardar el carrito actualizado
         await carrito.save();
         res.json({ msg: 'Cantidad actualizada en el carrito', carrito });
     } catch (error) {
-        console.error('Error al actualizar la cantidad del producto en el carrito:', error);
+        console.error('Error al actualizar cantidad:', error);
         res.status(500).json({ msg: 'Error al actualizar el producto en el carrito' });
     }
 };
 
-
-
 // Eliminar producto del carrito (PUT)
 const carritoPUT = async (req = request, res = response) => {
-    const { productoId } = req.body;
+    const { productoId, talle } = req.body;
     const usuarioId = req.usuario._id;
 
     try {
-        // Obtener el carrito del usuario
         const carrito = await Carrito.findOne({ usuario: usuarioId });
         if (!carrito) {
             return res.status(404).json({ msg: 'El carrito no existe' });
         }
 
-        // Filtrar el producto del carrito
-        carrito.productos = carrito.productos.filter(p => p.producto.toString() !== productoId);
+        carrito.productos = carrito.productos.filter(
+            p => !(p.producto.toString() === productoId && p.talle === talle)
+        );
 
-        // Guardar el carrito actualizado
         await carrito.save();
-
         res.json({ msg: 'Producto eliminado del carrito', carrito });
     } catch (error) {
         console.error('Error al eliminar producto del carrito:', error);
         res.status(500).json({ msg: 'Error al eliminar producto del carrito' });
     }
-};
+}
 
 // Limpiar el carrito (DELETE)
 const carritoDELETE = async (req = request, res = response) => {
