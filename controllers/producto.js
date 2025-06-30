@@ -102,7 +102,7 @@ const productosGET = async (req = request, res = response) => {
 
     // Filtro por categoría (solo un string)
     if (categoria) {
-        searchQuery.categoria = categoria.toUpperCase();
+        searchQuery.categoria = categoria;
     }
 
     // Filtro por talle (solo un string)
