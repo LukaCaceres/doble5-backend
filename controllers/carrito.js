@@ -62,21 +62,22 @@ const carritoActualizarCantidad = async (req = request, res = response) => {
             return res.status(404).json({ msg: 'Producto no encontrado en el carrito' });
         }
 
-        productoEnCarrito.cantidad = cantidad;
-
-        if (productoEnCarrito.cantidad <= 0) {
+        if (cantidad <= 0) {
             carrito.productos = carrito.productos.filter(
                 p => !(p.producto.toString() === productoId && p.talle === talle)
             );
+        } else {
+            productoEnCarrito.cantidad = cantidad;
         }
 
         await carrito.save();
         res.json({ msg: 'Cantidad actualizada en el carrito', carrito });
     } catch (error) {
-        console.error('Error al actualizar cantidad:', error);
+        console.error('Error al actualizar la cantidad del producto en el carrito:', error);
         res.status(500).json({ msg: 'Error al actualizar el producto en el carrito' });
     }
 };
+
 
 // Eliminar producto del carrito (PUT)
 const carritoPUT = async (req = request, res = response) => {
