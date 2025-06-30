@@ -90,46 +90,37 @@ const productosGET = async (req = request, res = response) => {
     } = req.query;
 
     const searchQuery = { activo: true };
-    const andConditions = [];
 
-    // Búsqueda por nombre o categoría (query general)
+    // Búsqueda general (query de texto)
     if (query) {
         const regex = new RegExp(query, 'i');
-        andConditions.push({
-            $or: [
-                { nombre: regex },
-                { categoria: regex }
-            ]
-        });
+        searchQuery.$or = [
+            { nombre: regex },
+            { categoria: regex }
+        ];
     }
 
-    // Filtro por categoría (pueden ser varias separadas por coma)
+    // Filtro por categorías exactas
     if (categoria) {
-        const categoriasArray = Array.isArray(categoria) ? categoria : categoria.split(',');
-        andConditions.push({
-            categoria: { $in: categoriasArray.map(c => c.toUpperCase()) }
-        });
+        const categoriasArray = Array.isArray(categoria)
+            ? categoria
+            : categoria.split(',');
+        searchQuery.categoria = { $in: categoriasArray.map(c => c.toUpperCase()) };
     }
 
     // Filtro por talles
     if (talles) {
-        const tallesArray = Array.isArray(talles) ? talles : talles.split(',');
-        andConditions.push({
-            'talles.talle': { $in: tallesArray.map(t => t.toUpperCase()) }
-        });
+        const tallesArray = Array.isArray(talles)
+            ? talles
+            : talles.split(',');
+        searchQuery['talles.talle'] = { $in: tallesArray.map(t => t.toUpperCase()) };
     }
 
-    // Filtro por rango de precio
+    // Filtro por precio
     if (precioMin || precioMax) {
-        const rango = {};
-        if (precioMin) rango.$gte = Number(precioMin);
-        if (precioMax) rango.$lte = Number(precioMax);
-        andConditions.push({ precio: rango });
-    }
-
-    // Combinar condiciones si hay
-    if (andConditions.length > 0) {
-        searchQuery.$and = andConditions;
+        searchQuery.precio = {};
+        if (precioMin) searchQuery.precio.$gte = Number(precioMin);
+        if (precioMax) searchQuery.precio.$lte = Number(precioMax);
     }
 
     // Ordenamiento
@@ -146,15 +137,13 @@ const productosGET = async (req = request, res = response) => {
                 .limit(Number(limite))
         ]);
 
-        res.json({
-            total,
-            productos
-        });
+        res.json({ total, productos });
     } catch (error) {
         console.error('Error al obtener productos:', error);
         res.status(500).json({ msg: 'Error al obtener los productos' });
     }
 };
+
 
 
 
