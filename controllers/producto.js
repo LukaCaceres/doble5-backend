@@ -90,33 +90,46 @@ const productosGET = async (req = request, res = response) => {
     } = req.query;
 
     const searchQuery = { activo: true };
+    const andConditions = [];
 
     // Búsqueda por nombre o categoría (query general)
     if (query) {
         const regex = new RegExp(query, 'i');
-        searchQuery.$or = [
-            { nombre: regex },
-            { categoria: regex }
-        ];
+        andConditions.push({
+            $or: [
+                { nombre: regex },
+                { categoria: regex }
+            ]
+        });
     }
 
-    // Filtro por categoría exacta
+    // Filtro por categoría (pueden ser varias separadas por coma)
     if (categoria) {
         const categoriasArray = Array.isArray(categoria) ? categoria : categoria.split(',');
-        searchQuery.categoria = { $in: categoriasArray.map(c => c.toUpperCase()) };
+        andConditions.push({
+            categoria: { $in: categoriasArray.map(c => c.toUpperCase()) }
+        });
     }
 
-    // Filtro por talles (al menos un talle coincidente)
+    // Filtro por talles
     if (talles) {
-        const tallesArray = Array.isArray(talles) ? talles : [talles];
-        searchQuery['talles.talle'] = { $in: tallesArray.map(t => t.toUpperCase()) };
+        const tallesArray = Array.isArray(talles) ? talles : talles.split(',');
+        andConditions.push({
+            'talles.talle': { $in: tallesArray.map(t => t.toUpperCase()) }
+        });
     }
 
     // Filtro por rango de precio
     if (precioMin || precioMax) {
-        searchQuery.precio = {};
-        if (precioMin) searchQuery.precio.$gte = Number(precioMin);
-        if (precioMax) searchQuery.precio.$lte = Number(precioMax);
+        const rango = {};
+        if (precioMin) rango.$gte = Number(precioMin);
+        if (precioMax) rango.$lte = Number(precioMax);
+        andConditions.push({ precio: rango });
+    }
+
+    // Combinar condiciones si hay
+    if (andConditions.length > 0) {
+        searchQuery.$and = andConditions;
     }
 
     // Ordenamiento
@@ -142,6 +155,7 @@ const productosGET = async (req = request, res = response) => {
         res.status(500).json({ msg: 'Error al obtener los productos' });
     }
 };
+
 
 
 // Obtener un producto por ID
