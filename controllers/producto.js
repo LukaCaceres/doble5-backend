@@ -102,7 +102,8 @@ const productosGET = async (req = request, res = response) => {
 
     // Filtro por categoría exacta
     if (categoria) {
-        searchQuery.categoria = categoria.toUpperCase();
+        const categoriasArray = Array.isArray(categoria) ? categoria : categoria.split(',');
+        searchQuery.categoria = { $in: categoriasArray.map(c => c.toUpperCase()) };
     }
 
     // Filtro por talles (al menos un talle coincidente)
