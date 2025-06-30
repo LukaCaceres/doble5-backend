@@ -78,25 +78,56 @@ const productoPOST = async (req = request, res = response) => {
 
 // Obtener productos con búsqueda opcional y paginación
 const productosGET = async (req = request, res = response) => {
-    const { query = '', limite = 8, desde = 0 } = req.query;
+    const {
+        query = '',
+        limite = 8,
+        desde = 0,
+        categoria,
+        talles,
+        precioMin,
+        precioMax,
+        orden
+    } = req.query;
 
-    // Construimos la consulta base: solo productos activos
     const searchQuery = { activo: true };
 
-    // Si hay un término de búsqueda, agregamos el filtro de búsqueda
+    // Búsqueda por nombre o categoría (query general)
     if (query) {
-        const regex = new RegExp(query, 'i'); // Expresión regular insensible a mayúsculas
+        const regex = new RegExp(query, 'i');
         searchQuery.$or = [
             { nombre: regex },
             { categoria: regex }
         ];
     }
 
+    // Filtro por categoría exacta
+    if (categoria) {
+        searchQuery.categoria = categoria.toUpperCase();
+    }
+
+    // Filtro por talles (al menos un talle coincidente)
+    if (talles) {
+        const tallesArray = Array.isArray(talles) ? talles : [talles];
+        searchQuery['talles.talle'] = { $in: tallesArray.map(t => t.toUpperCase()) };
+    }
+
+    // Filtro por rango de precio
+    if (precioMin || precioMax) {
+        searchQuery.precio = {};
+        if (precioMin) searchQuery.precio.$gte = Number(precioMin);
+        if (precioMax) searchQuery.precio.$lte = Number(precioMax);
+    }
+
+    // Ordenamiento
+    const sort = {};
+    if (orden === 'asc') sort.precio = 1;
+    else if (orden === 'desc') sort.precio = -1;
+
     try {
-        // Obtenemos el total de resultados y los productos paginados
         const [total, productos] = await Promise.all([
             Producto.countDocuments(searchQuery),
             Producto.find(searchQuery)
+                .sort(sort)
                 .skip(Number(desde))
                 .limit(Number(limite))
         ]);
