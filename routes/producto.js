@@ -20,6 +20,9 @@ router.post('/', [
 // Obtener todos los productos con paginación
 router.get('/', productosGET);
 
+// Ruta para obtener los productos destacados
+router.get('/destacados', obtenerProductosDestacados);
+
 // Obtener un producto por ID
 router.get('/:id', [
     check('id', 'El ID no es válido').isMongoId(),
@@ -49,7 +52,6 @@ router.delete('/:id', [
 // Ruta para marcar o desmarcar un producto como destacado (solo administradores)
 router.put('/:id/destacar', [validarJWT, esAdminRol], marcarProductoDestacado);
 
-// Ruta para obtener los productos destacados
-router.get('/destacados', obtenerProductosDestacados);
+
 
 module.exports = router;
