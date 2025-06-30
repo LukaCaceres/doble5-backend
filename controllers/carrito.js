@@ -6,7 +6,9 @@ const carritoGET = async (req = request, res = response) => {
     const usuarioId = req.usuario._id;
 
     try {
-        const carrito = await Carrito.findOne({ usuario: usuarioId }).populate('productos.producto', 'nombre precio imagenes');
+        const carrito = await Carrito.findOne({ usuario: usuarioId })
+            .populate('productos.producto', 'nombre precio imagenes talles'); // 👈 incluimos 'talles'
+
         if (!carrito) {
             return res.status(404).json({ msg: 'El carrito no existe' });
         }
