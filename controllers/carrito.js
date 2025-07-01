@@ -32,10 +32,17 @@ const carritoPOST = async (req = request, res = response) => {
         }
 
         // Asegurar que la comparación siempre funcione
-        const productoExistente = carrito.productos.find(p => {
-            const id = typeof p.producto === 'object' ? p.producto._id.toString() : p.producto.toString();
-            return id === productoId && p.talle === talle;
-        });
+        console.log(carrito.productos.map(p => ({
+            id: p.producto.toString(),
+            talle: p.talle
+        })));
+
+        const productoExistente = carrito.productos.find(p =>
+            p.producto.equals(productoId) &&
+            p.talle.trim().toLowerCase() === talle.trim().toLowerCase()
+        );
+
+
 
         if (productoExistente) {
             productoExistente.cantidad += cantidad;
