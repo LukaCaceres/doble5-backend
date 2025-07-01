@@ -26,17 +26,24 @@ const carritoPOST = async (req = request, res = response) => {
     const usuarioId = req.usuario._id;
 
     try {
-        // Obtener el carrito del usuario o crearlo si no existe
         let carrito = await Carrito.findOne({ usuario: usuarioId });
         if (!carrito) {
             carrito = new Carrito({ usuario: usuarioId, productos: [] });
         }
 
-        // Agregar el producto al carrito
-        carrito.productos.push({ producto: productoId, cantidad, talle });
+        // Buscar si ya existe el producto con el talle en el carrito
+        const productoExistente = carrito.productos.find(
+            p => p.producto.toString() === productoId && p.talle === talle
+        );
 
+        if (productoExistente) {
+            // Si existe, sumamos la cantidad
+            productoExistente.cantidad += cantidad;
+        } else {
+            // Si no existe, agregamos nuevo producto con talle y cantidad
+            carrito.productos.push({ producto: productoId, cantidad, talle });
+        }
 
-        // Guardar el carrito actualizado
         await carrito.save();
         res.json({ msg: 'Producto agregado al carrito', carrito });
     } catch (error) {
@@ -44,6 +51,7 @@ const carritoPOST = async (req = request, res = response) => {
         res.status(500).json({ msg: 'Error al agregar producto al carrito' });
     }
 };
+
 
 // Actualizar cantidad de producto en el carrito (PUT)
 const carritoActualizarCantidad = async (req = request, res = response) => {
