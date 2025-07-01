@@ -31,16 +31,15 @@ const carritoPOST = async (req = request, res = response) => {
             carrito = new Carrito({ usuario: usuarioId, productos: [] });
         }
 
-        // Buscar si ya existe el producto con el talle en el carrito
-        const productoExistente = carrito.productos.find(
-            p => p.producto.toString() === productoId && p.talle === talle
-        );
+        // Asegurar que la comparación siempre funcione
+        const productoExistente = carrito.productos.find(p => {
+            const id = typeof p.producto === 'object' ? p.producto._id.toString() : p.producto.toString();
+            return id === productoId && p.talle === talle;
+        });
 
         if (productoExistente) {
-            // Si existe, sumamos la cantidad
             productoExistente.cantidad += cantidad;
         } else {
-            // Si no existe, agregamos nuevo producto con talle y cantidad
             carrito.productos.push({ producto: productoId, cantidad, talle });
         }
 
@@ -51,6 +50,7 @@ const carritoPOST = async (req = request, res = response) => {
         res.status(500).json({ msg: 'Error al agregar producto al carrito' });
     }
 };
+
 
 
 // Actualizar cantidad de producto en el carrito (PUT)
