@@ -31,22 +31,19 @@ exports.crearPreferencia = async (req, res) => {
             unit_price: item.producto.precio
         }));
 
-        const preferencia = await mercadopago.preference.create({
-            body: {
-                items,
-                payer: { email: emailComprador },
-                back_urls: {
-                    success: `${process.env.FRONTEND_URL}/success`,
-                    failure: `${process.env.FRONTEND_URL}/failure`,
-                    pending: `${process.env.FRONTEND_URL}/pending`
-                },
-                notification_url: process.env.NOTIFICATION_URL,
-                auto_return: 'approved'
-            }
+        const preferencia = await mercadopago.preferences.create({
+            items,
+            payer: { email: emailComprador },
+            back_urls: {
+                success: `${process.env.FRONTEND_URL}/success`,
+                failure: `${process.env.FRONTEND_URL}/failure`,
+                pending: `${process.env.FRONTEND_URL}/pending`
+            },
+            notification_url: process.env.NOTIFICATION_URL,
+            auto_return: 'approved'
         });
 
-
-        console.log("✅ Preferencia creada:", preferencia.id);
+        console.log("✅ Preferencia creada:", preferencia.body.id);
 
         await Orden.create({
             usuario: idUsuario,
@@ -56,11 +53,11 @@ exports.crearPreferencia = async (req, res) => {
                 precio_unitario: p.unit_price
             })),
             comprador: { email: emailComprador },
-            id_preferencia: preferencia.id,
+            id_preferencia: preferencia.body.id,
             estado_pago: 'pendiente'
         });
 
-        res.status(200).json({ id: preferencia.id });
+        res.status(200).json({ id: preferencia.body.id });
 
     } catch (error) {
         console.error('❌ Error al crear preferencia:', error);
@@ -71,13 +68,15 @@ exports.crearPreferencia = async (req, res) => {
 
 
 
+
 exports.procesarWebhook = async (req, res) => {
   try {
     const idPago = req.query['data.id'];
     const tipo = req.query.type;
 
     if (tipo === 'payment') {
-      const pago = await mercadopago.payment.get({ id: idPago }); // ← uso correcto del nuevo SDK
+      const pagoResponse = await mercadopago.payment.get(idPago);
+      const pago = pagoResponse.body;
 
       const {
         id,
