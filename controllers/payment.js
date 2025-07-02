@@ -6,7 +6,12 @@ const preferencias = mercadopago.preferences;
 
 exports.crearPreferencia = async (req, res) => {
     try {
-        if (!req.usuario) return res.status(401).json({ error: 'No autorizado' });
+        console.log("↪️ Entrando a crearPreferencia");
+        console.log("🔐 Usuario:", req.usuario);
+
+        if (!req.usuario) {
+            return res.status(401).json({ error: 'No autorizado' });
+        }
 
         const idUsuario = req.usuario._id;
         const emailComprador = req.usuario.email;
@@ -14,8 +19,11 @@ exports.crearPreferencia = async (req, res) => {
         const carrito = await Carrito.findOne({ usuario: idUsuario }).populate('productos.producto');
 
         if (!carrito || carrito.productos.length === 0) {
+            console.log("🛒 Carrito vacío o no encontrado");
             return res.status(400).json({ error: 'El carrito está vacío.' });
         }
+
+        console.log("📦 Productos en carrito:", carrito.productos);
 
         const items = carrito.productos.map(item => ({
             title: item.producto.nombre,
@@ -37,6 +45,8 @@ exports.crearPreferencia = async (req, res) => {
             }
         });
 
+        console.log("✅ Preferencia creada:", preferencia.id);
+
         await Orden.create({
             usuario: idUsuario,
             productos: items.map(p => ({
@@ -52,10 +62,11 @@ exports.crearPreferencia = async (req, res) => {
         res.status(200).json({ id: preferencia.id });
 
     } catch (error) {
-        console.error('Error al crear preferencia:', error.message);
+        console.error('❌ Error al crear preferencia:', error);
         res.status(500).json({ error: 'Error al procesar el pago' });
     }
 };
+
 
 
 
