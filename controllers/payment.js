@@ -2,7 +2,7 @@ const mercadopago = require('../config/mercadoPago');
 const Orden = require('../models/orden');
 const Carrito = require('../models/carrito');
 
-const preferencias = mercadopago.preferences;
+
 
 exports.crearPreferencia = async (req, res) => {
     try {
@@ -31,7 +31,7 @@ exports.crearPreferencia = async (req, res) => {
             unit_price: item.producto.precio
         }));
 
-        const preferencia = await preferencias.create({
+        const preferencia = await mercadopago.preference.create({
             body: {
                 items,
                 payer: { email: emailComprador },
@@ -44,6 +44,7 @@ exports.crearPreferencia = async (req, res) => {
                 auto_return: 'approved'
             }
         });
+
 
         console.log("✅ Preferencia creada:", preferencia.id);
 
@@ -71,55 +72,52 @@ exports.crearPreferencia = async (req, res) => {
 
 
 exports.procesarWebhook = async (req, res) => {
-    try {
-        const idPago = req.query['data.id'];
-        const tipo = req.query.type;
+  try {
+    const idPago = req.query['data.id'];
+    const tipo = req.query.type;
 
-        if (tipo === 'payment') {
-            const pago = await mercadopago.payments.get({ id: idPago });
+    if (tipo === 'payment') {
+      const pago = await mercadopago.payment.get({ id: idPago }); // ← uso correcto del nuevo SDK
 
-            const {
-                id,
-                status,
-                status_detail,
-                date_approved,
-                order: { id: idPreferencia } = {}
-            } = pago;
+      const {
+        id,
+        status,
+        status_detail,
+        date_approved,
+        order: { id: idPreferencia } = {}
+      } = pago;
 
-            const orden = await Orden.findOneAndUpdate(
-                { id_preferencia: idPreferencia },
-                {
-                    id_pago: id,
-                    estado_pago: status,
-                    detalle_estado: status_detail,
-                    fecha_aprobado: date_approved
-                },
-                { new: true }
-            );
+      const orden = await Orden.findOneAndUpdate(
+        { id_preferencia: idPreferencia },
+        {
+          id_pago: id,
+          estado_pago: status,
+          detalle_estado: status_detail,
+          fecha_aprobado: date_approved
+        },
+        { new: true }
+      );
 
-            if (orden && status === 'approved') {
-                // Vaciar el carrito del usuario
-                await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
+      if (orden && status === 'approved') {
+        await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
 
-                // Descontar stock
-                for (const item of orden.productos) {
-                    await Producto.findOneAndUpdate(
-                        { nombre: item.titulo, 'talles.talle': item.talle },
-                        { $inc: { 'talles.$.stock': -item.cantidad } }
-                    );
-                }
-
-                console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado.`);
-            }
-
-
-            console.log('🧾 Orden actualizada:', orden);
+        for (const item of orden.productos) {
+          await Producto.findOneAndUpdate(
+            { nombre: item.titulo, 'talles.talle': item.talle },
+            { $inc: { 'talles.$.stock': -item.cantidad } }
+          );
         }
 
-        res.sendStatus(200);
-    } catch (error) {
-        console.error('Error en webhook:', error.message);
-        res.sendStatus(500);
+        console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado.`);
+      }
+
+      console.log('🧾 Orden actualizada:', orden);
     }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error en webhook:', error.message);
+    res.sendStatus(500);
+  }
 };
 
