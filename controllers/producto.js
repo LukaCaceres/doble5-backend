@@ -43,7 +43,7 @@ const productoPOST = async (req = request, res = response) => {
     }
 
     try {
-        const productoExistente = await Producto.findOne({ nombre: nombre.toUpperCase() });
+        const productoExistente = await Producto.findOne({ nombre: nombre });
         if (productoExistente) {
             return res.status(400).json({
                 msg: `El producto ${nombre} ya existe.`
@@ -56,9 +56,9 @@ const productoPOST = async (req = request, res = response) => {
         }));
 
         const producto = new Producto({
-            nombre: nombre.toUpperCase(),
+            nombre: nombre,
             descripcion,
-            categoria: categoria.toUpperCase(),
+            categoria: categoria,
             precio,
             imagenes,
             talles: tallesNormalizados
@@ -165,11 +165,11 @@ const productoPUT = async (req = request, res = response) => {
     const { ...data } = req.body;
 
     if (data.nombre) {
-        data.nombre = data.nombre.toUpperCase();
+        data.nombre = data.nombre;
     }
 
     if (data.categoria) {
-        data.categoria = data.categoria.toUpperCase();
+        data.categoria = data.categoria;
     }
 
     // Validación opcional de talles
