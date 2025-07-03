@@ -1,10 +1,109 @@
+const { MercadoPagoConfig, Preference, Payment, MerchantOrder } = require('mercadopago');
 const client = require('../config/mercadoPago');
 const Orden = require('../models/orden');
 const Carrito = require('../models/carrito');
 const Producto = require('../models/producto');
-const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+
 const preference = new Preference(client);
-const payment = new Payment();
+const payment = new Payment(client);
+const merchantOrder = new MerchantOrder(client);
+
+// Función reutilizable para buscar un pago con retries
+const obtenerPago = async (idPago, reintentos = 5) => {
+    for (let i = 0; i < reintentos; i++) {
+        try {
+            const { body } = await payment.get({ id: idPago });
+            if (body) return body;
+        } catch (err) {
+            console.warn(`⏳ Intento ${i + 1}: aún no se encuentra el pago ${idPago}`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 3 segundos
+        }
+    }
+    return null;
+};
+
+exports.procesarWebhook = async (req, res) => {
+    try {
+        console.log('📩 Webhook payload:', JSON.stringify(req.body));
+
+        const tipo = req.body?.type || req.query?.type;
+        const idPago = req.body?.data?.id || req.query['data.id'] || req.query?.id || req.body?.id;
+        const topic = req.body?.topic || req.query?.topic;
+        const resource = req.body?.resource;
+
+        // 🟢 Prioridad 1: Webhook tipo "merchant_order"
+        if (topic === 'merchant_order' && resource) {
+            const idOrden = resource.split('/').pop();
+            const { body: ordenMP } = await merchantOrder.get({ id: idOrden });
+
+            if (ordenMP?.payments?.length > 0) {
+                const pagoAprobado = ordenMP.payments.find(p => p.status === 'approved');
+                if (pagoAprobado) {
+                    console.log('🔁 Redireccionando webhook desde merchant_order a payment con id:', pagoAprobado.id);
+                    req.body = { type: 'payment', data: { id: pagoAprobado.id } };
+                    return exports.procesarWebhook(req, res); // Reinvocamos con el nuevo idPago
+                }
+            }
+
+            return res.sendStatus(200); // No hay pagos aprobados aún
+        }
+
+        // 🟡 Segundo caso: tipo payment directo
+        if (tipo === 'payment' && idPago) {
+            const pago = await obtenerPago(idPago);
+            if (!pago) {
+                console.warn(`⚠️ Pago con id ${idPago} no encontrado.`);
+                return res.sendStatus(404);
+            }
+
+            const {
+                id,
+                status,
+                status_detail,
+                date_approved,
+                order: { id: idPreferencia } = {}
+            } = pago;
+
+            const orden = await Orden.findOneAndUpdate(
+                { id_preferencia: idPreferencia },
+                {
+                    id_pago: id,
+                    estado_pago: status,
+                    detalle_estado: status_detail,
+                    fecha_aprobado: date_approved
+                },
+                { new: true }
+            );
+
+            if (orden) {
+                console.log(`🧾 Orden actualizada: ${orden._id}`);
+
+                if (status === 'approved') {
+                    await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
+
+                    for (const item of orden.productos) {
+                        await Producto.findOneAndUpdate(
+                            { nombre: item.titulo, 'talles.talle': item.talle },
+                            { $inc: { 'talles.$.stock': -item.cantidad } }
+                        );
+                    }
+
+                    console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
+                }
+            } else {
+                console.warn(`⚠️ No se encontró orden con id_preferencia ${idPreferencia}`);
+            }
+        } else {
+            console.log('Webhook recibido pero no es de tipo payment ni merchant_order con ID válido');
+        }
+
+        res.sendStatus(200);
+    } catch (error) {
+        console.error('❌ Error en webhook:', error.message);
+        res.sendStatus(500);
+    }
+};
+
 
 exports.crearPreferencia = async (req, res) => {
     try {
@@ -84,81 +183,7 @@ exports.crearPreferencia = async (req, res) => {
 };
 
 
-const obtenerPago = async (idPago, reintentos = 3) => {
-    for (let i = 0; i < reintentos; i++) {
-        try {
-            const { body: pago } = await payment.get({ id: idPago });
-            if (pago) return pago;
-        } catch (err) {
-            console.warn(`⏳ Intento ${i + 1}: aún no se encuentra el pago ${idPago}`);
-            await new Promise(resolve => setTimeout(resolve, 2000)); // esperar 2 segundos
-        }
-    }
-    return null;
-}
 
-exports.procesarWebhook = async (req, res) => {
-    try {
-        console.log('📩 Webhook payload:', JSON.stringify(req.body));
-
-        // Intentar obtener idPago y tipo desde body o query
-        const idPago = req.body?.data?.id || req.query['data.id'] || req.query['id'] || req.body?.id;
-        const tipo = req.body?.type || req.query.type;
-
-        if (tipo === 'payment' && idPago) {
-            const pago = await obtenerPago(idPago);
-
-            if (!pago) {
-                console.warn(`⚠️ Pago con id ${idPago} no encontrado.`);
-                return res.sendStatus(404);
-            }
-
-            const {
-                id,
-                status,
-                status_detail,
-                date_approved,
-                order: { id: idPreferencia } = {}
-            } = pago;
-
-            const orden = await Orden.findOneAndUpdate(
-                { id_preferencia: idPreferencia },
-                {
-                    id_pago: id,
-                    estado_pago: status,
-                    detalle_estado: status_detail,
-                    fecha_aprobado: date_approved
-                },
-                { new: true }
-            );
-
-            if (orden) {
-                console.log(`🧾 Orden actualizada: ${orden._id}`);
-
-                if (status === 'approved') {
-                    await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
-
-                    for (const item of orden.productos) {
-                        await Producto.findOneAndUpdate(
-                            { nombre: item.titulo, 'talles.talle': item.talle },
-                            { $inc: { 'talles.$.stock': -item.cantidad } }
-                        );
-                    }
-                    console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
-                }
-            } else {
-                console.warn(`⚠️ No se encontró orden con id_preferencia ${idPreferencia}`);
-            }
-        } else {
-            console.log('Webhook recibido pero no es de tipo payment o no tiene idPago');
-        }
-
-        res.sendStatus(200);
-    } catch (error) {
-        console.error('❌ Error en webhook:', error.message);
-        res.sendStatus(500);
-    }
-};
 
 
 
