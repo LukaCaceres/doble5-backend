@@ -1,8 +1,10 @@
 const client = require('../config/mercadoPago');
 const Orden = require('../models/orden');
 const Carrito = require('../models/carrito');
-const { MercadoPagoConfig, Preference } = require('mercadopago');
+const Producto = require('../models/producto');
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const preference = new Preference(client);
+const payment = new Payment(client)
 
 exports.crearPreferencia = async (req, res) => {
     try {
@@ -82,7 +84,7 @@ exports.procesarWebhook = async (req, res) => {
         const tipo = req.query.type;
 
         if (tipo === 'payment') {
-            const pago = await mercadopago.payments.get({ id: idPago });
+            const { body: pago } = await payment.get({ id: idPago });
 
             const {
                 id,
@@ -104,10 +106,10 @@ exports.procesarWebhook = async (req, res) => {
             );
 
             if (orden && status === 'approved') {
-                // Vaciar el carrito del usuario
+                // Vaciar carrito
                 await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
 
-                // Descontar stock
+                // Descontar stock por talle
                 for (const item of orden.productos) {
                     await Producto.findOneAndUpdate(
                         { nombre: item.titulo, 'talles.talle': item.talle },
@@ -115,16 +117,15 @@ exports.procesarWebhook = async (req, res) => {
                     );
                 }
 
-                console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado.`);
+                console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
             }
-
 
             console.log('🧾 Orden actualizada:', orden);
         }
 
         res.sendStatus(200);
     } catch (error) {
-        console.error('Error en webhook:', error.message);
+        console.error('❌ Error en webhook:', error.message);
         res.sendStatus(500);
     }
 };
