@@ -42,6 +42,13 @@ exports.crearPreferencia = async (req, res) => {
                     email: emailComprador,
 
                 },
+                payment_methods: {
+                    excluded_payment_types: [
+                        { id: 'ticket' },      // Excluye pagos en efectivo con ticket (rapipago, pago fácil)
+                        { id: 'atm' },         // Excluye pagos por cajero automático
+                    ],
+                    installments: 12,  // Máximo cuotas (podés cambiar)
+                },
                 back_urls: {
                     success: `${process.env.FRONTEND_URL}/success`,
                     failure: `${process.env.FRONTEND_URL}/failure`,
@@ -80,11 +87,16 @@ exports.crearPreferencia = async (req, res) => {
 
 exports.procesarWebhook = async (req, res) => {
     try {
-        const idPago = req.query['data.id'];
-        const tipo = req.query.type;
+        const idPago = req.body?.data?.id;
+        const tipo = req.body?.type;
 
-        if (tipo === 'payment') {
+        if (tipo === 'payment' && idPago) {
             const { body: pago } = await payment.get({ id: idPago });
+
+            if (!pago) {
+                console.warn(`⚠️ Pago con id ${idPago} no encontrado.`);
+                return res.sendStatus(404);
+            }
 
             const {
                 id,
@@ -105,22 +117,28 @@ exports.procesarWebhook = async (req, res) => {
                 { new: true }
             );
 
-            if (orden && status === 'approved') {
-                // Vaciar carrito
-                await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
+            if (orden) {
+                console.log(`🧾 Orden actualizada: ${orden._id}`);
 
-                // Descontar stock por talle
-                for (const item of orden.productos) {
-                    await Producto.findOneAndUpdate(
-                        { nombre: item.titulo, 'talles.talle': item.talle },
-                        { $inc: { 'talles.$.stock': -item.cantidad } }
-                    );
+                if (status === 'approved') {
+                    // Vaciar carrito
+                    await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
+
+                    // Descontar stock por talle
+                    for (const item of orden.productos) {
+                        await Producto.findOneAndUpdate(
+                            { nombre: item.titulo, 'talles.talle': item.talle },
+                            { $inc: { 'talles.$.stock': -item.cantidad } }
+                        );
+                    }
+
+                    console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
                 }
-
-                console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
+            } else {
+                console.warn(`⚠️ No se encontró orden con id_preferencia ${idPreferencia}`);
             }
-
-            console.log('🧾 Orden actualizada:', orden);
+        } else {
+            console.log('Webhook recibido pero no es de tipo payment o no tiene idPago');
         }
 
         res.sendStatus(200);
@@ -129,4 +147,5 @@ exports.procesarWebhook = async (req, res) => {
         res.sendStatus(500);
     }
 };
+
 
