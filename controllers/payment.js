@@ -64,10 +64,11 @@ exports.crearPreferencia = async (req, res) => {
 
         await Orden.create({
             usuario: idUsuario,
-            productos: items.map(p => ({
-                titulo: p.title,
-                cantidad: p.quantity,
-                precio_unitario: p.unit_price
+            productos: carrito.productos.map(item => ({
+                titulo: item.producto.nombre,
+                cantidad: item.cantidad,
+                precio_unitario: item.producto.precio,
+                talle: item.talle
             })),
             comprador: { email: emailComprador },
             id_preferencia: preferencia.id,
