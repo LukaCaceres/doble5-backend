@@ -88,8 +88,11 @@ exports.crearPreferencia = async (req, res) => {
 
 exports.procesarWebhook = async (req, res) => {
     try {
-        const idPago = req.body?.data?.id;
-        const tipo = req.body?.type;
+        console.log('📩 Webhook payload:', JSON.stringify(req.body));
+
+        // Intentar obtener idPago y tipo desde body o query
+        const idPago = req.body?.data?.id || req.query['data.id'] || req.query['id'] || req.body?.id;
+        const tipo = req.body?.type || req.query.type;
 
         if (tipo === 'payment' && idPago) {
             const { body: pago } = await payment.get({ id: idPago });
@@ -122,17 +125,14 @@ exports.procesarWebhook = async (req, res) => {
                 console.log(`🧾 Orden actualizada: ${orden._id}`);
 
                 if (status === 'approved') {
-                    // Vaciar carrito
                     await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
 
-                    // Descontar stock por talle
                     for (const item of orden.productos) {
                         await Producto.findOneAndUpdate(
                             { nombre: item.titulo, 'talles.talle': item.talle },
                             { $inc: { 'talles.$.stock': -item.cantidad } }
                         );
                     }
-
                     console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
                 }
             } else {
@@ -148,5 +148,6 @@ exports.procesarWebhook = async (req, res) => {
         res.sendStatus(500);
     }
 };
+
 
 
