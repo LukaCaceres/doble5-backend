@@ -4,7 +4,7 @@ const Carrito = require('../models/carrito');
 const Producto = require('../models/producto');
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const preference = new Preference(client);
-const payment = new Payment(client)
+const payment = new Payment();
 
 exports.crearPreferencia = async (req, res) => {
     try {
@@ -84,7 +84,18 @@ exports.crearPreferencia = async (req, res) => {
 };
 
 
-
+const obtenerPago = async (idPago, reintentos = 3) => {
+    for (let i = 0; i < reintentos; i++) {
+        try {
+            const { body: pago } = await payment.get({ id: idPago });
+            if (pago) return pago;
+        } catch (err) {
+            console.warn(`⏳ Intento ${i + 1}: aún no se encuentra el pago ${idPago}`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // esperar 2 segundos
+        }
+    }
+    return null;
+}
 
 exports.procesarWebhook = async (req, res) => {
     try {
@@ -95,7 +106,7 @@ exports.procesarWebhook = async (req, res) => {
         const tipo = req.body?.type || req.query.type;
 
         if (tipo === 'payment' && idPago) {
-            const { body: pago } = await payment.get({ id: idPago });
+            const pago = await obtenerPago(idPago);
 
             if (!pago) {
                 console.warn(`⚠️ Pago con id ${idPago} no encontrado.`);
