@@ -12,6 +12,7 @@ class Server {
         this.categoriaPath = '/api/categoria';
         this.carritoPath = '/api/carrito';
         this.paymentPath = '/api/payment';
+        this.ordenPath = '/api/orden'
 
         // Conectar con la DB
         this.conectarDB();
@@ -50,6 +51,7 @@ class Server {
         this.app.use(this.categoriaPath, require('../routes/categoria'));
         this.app.use(this.carritoPath, require('../routes/carrito'));
         this.app.use(this.paymentPath, require('../routes/payment'))
+        this.app.use(this.ordenPath, require ('../routes/orden'));
     }
 
     listen() {
