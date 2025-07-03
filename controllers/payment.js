@@ -8,98 +8,136 @@ const preference = new Preference(client);
 const payment = new Payment(client);
 const merchantOrder = new MerchantOrder(client);
 
-// Función reutilizable para buscar un pago con retries
+// Función mejorada para buscar un pago con retries
 const obtenerPago = async (idPago, reintentos = 5) => {
     for (let i = 0; i < reintentos; i++) {
         try {
-            const { body } = await payment.get({ id: idPago });
-            if (body) return body;
+            const pago = await payment.get({ id: idPago });
+            if (pago && pago.body) return pago.body;
         } catch (err) {
-            console.warn(`⏳ Intento ${i + 1}: aún no se encuentra el pago ${idPago}`);
-            await new Promise(resolve => setTimeout(resolve, 3000)); // 3 segundos
+            console.warn(`⏳ Intento ${i + 1}: Error al buscar pago ${idPago} - ${err.message}`);
+            await new Promise(resolve => setTimeout(resolve, 3000 * (i + 1))); // Retry con backoff exponencial
         }
     }
-    return null;
+    throw new Error(`No se pudo obtener el pago ${idPago} después de ${reintentos} intentos`);
+};
+
+// Extraer ID de la URL de recurso
+const extraerIdDeUrl = (url) => {
+    if (!url) return null;
+    const match = url.match(/\/(\d+)$/);
+    return match ? match[1] : null;
 };
 
 exports.procesarWebhook = async (req, res) => {
     try {
-        console.log('📩 Webhook payload:', JSON.stringify(req.body));
+        console.log('📩 Webhook payload:', JSON.stringify(req.body, null, 2));
 
-        const tipo = req.body?.type || req.query?.type;
-        const idPago = req.body?.data?.id || req.query['data.id'] || req.query?.id || req.body?.id;
-        const topic = req.body?.topic || req.query?.topic;
+        // Extracción mejorada de parámetros
+        const tipo = req.body?.type;
+        const idPago = req.body?.data?.id || extraerIdDeUrl(req.body?.resource);
+        const topic = req.body?.topic;
         const resource = req.body?.resource;
+        const action = req.body?.action;
 
-        // 🟢 Prioridad 1: Webhook tipo "merchant_order"
+        // 🟢 Caso 1: Webhook de merchant_order
         if (topic === 'merchant_order' && resource) {
-            const idOrden = resource.split('/').pop();
-            const { body: ordenMP } = await merchantOrder.get({ id: idOrden });
-
-            if (ordenMP?.payments?.length > 0) {
-                const pagoAprobado = ordenMP.payments.find(p => p.status === 'approved');
-                if (pagoAprobado) {
-                    console.log('🔁 Redireccionando webhook desde merchant_order a payment con id:', pagoAprobado.id);
-                    req.body = { type: 'payment', data: { id: pagoAprobado.id } };
-                    return exports.procesarWebhook(req, res); // Reinvocamos con el nuevo idPago
-                }
+            const idOrden = extraerIdDeUrl(resource);
+            if (!idOrden) {
+                console.warn('⚠️ No se pudo extraer ID de merchant_order');
+                return res.sendStatus(400);
             }
 
-            return res.sendStatus(200); // No hay pagos aprobados aún
-        }
+            console.log(`📦 Buscando merchant_order con ID: ${idOrden}`);
+            try {
+                const ordenMP = await merchantOrder.get({ merchantOrderId: idOrden });
 
-        // 🟡 Segundo caso: tipo payment directo
-        if (tipo === 'payment' && idPago) {
-            const pago = await obtenerPago(idPago);
-            if (!pago) {
-                console.warn(`⚠️ Pago con id ${idPago} no encontrado.`);
-                return res.sendStatus(404);
-            }
-
-            const {
-                id,
-                status,
-                status_detail,
-                date_approved,
-                order: { id: idPreferencia } = {}
-            } = pago;
-
-            const orden = await Orden.findOneAndUpdate(
-                { id_preferencia: idPreferencia },
-                {
-                    id_pago: id,
-                    estado_pago: status,
-                    detalle_estado: status_detail,
-                    fecha_aprobado: date_approved
-                },
-                { new: true }
-            );
-
-            if (orden) {
-                console.log(`🧾 Orden actualizada: ${orden._id}`);
-
-                if (status === 'approved') {
-                    await Carrito.findOneAndUpdate({ usuario: orden.usuario }, { productos: [] });
-
-                    for (const item of orden.productos) {
-                        await Producto.findOneAndUpdate(
-                            { nombre: item.titulo, 'talles.talle': item.talle },
-                            { $inc: { 'talles.$.stock': -item.cantidad } }
-                        );
+                if (ordenMP?.body?.payments?.length > 0) {
+                    const pagoAprobado = ordenMP.body.payments.find(p => p.status === 'approved');
+                    if (pagoAprobado) {
+                        console.log('🔁 Redireccionando webhook a payment con id:', pagoAprobado.id);
+                        req.body = { type: 'payment', data: { id: pagoAprobado.id } };
+                        return exports.procesarWebhook(req, res);
                     }
-
-                    console.log(`🧹 Carrito del usuario ${orden.usuario} vaciado y stock actualizado.`);
                 }
-            } else {
-                console.warn(`⚠️ No se encontró orden con id_preferencia ${idPreferencia}`);
+                return res.sendStatus(200);
+            } catch (err) {
+                console.error('❌ Error al obtener merchant_order:', err.message);
+                return res.sendStatus(500);
             }
-        } else {
-            console.log('Webhook recibido pero no es de tipo payment ni merchant_order con ID válido');
         }
 
+        // 🟡 Caso 2: Webhook de payment
+        if ((tipo === 'payment' || action === 'payment.created') && idPago) {
+            try {
+                const pago = await obtenerPago(idPago);
+
+                const {
+                    id,
+                    status,
+                    status_detail,
+                    date_approved,
+                    order = {}
+                } = pago;
+
+                const idPreferencia = order.id || id; // Algunos pagos tienen el ID de preferencia en order.id
+
+                const orden = await Orden.findOneAndUpdate(
+                    { id_preferencia: idPreferencia },
+                    {
+                        id_pago: id,
+                        estado_pago: status,
+                        detalle_estado: status_detail,
+                        fecha_aprobado: date_approved
+                    },
+                    { new: true }
+                );
+
+                if (orden) {
+                    console.log(`🧾 Orden actualizada: ${orden._id} - Estado: ${status}`);
+
+                    if (status === 'approved') {
+                        // Vaciar carrito y actualizar stock
+                        await Carrito.findOneAndUpdate(
+                            { usuario: orden.usuario },
+                            { productos: [] }
+                        );
+
+                        // Actualizar stock de productos
+                        const bulkOps = orden.productos.map(item => ({
+                            updateOne: {
+                                filter: {
+                                    nombre: item.titulo,
+                                    'talles.talle': item.talle
+                                },
+                                update: {
+                                    $inc: { 'talles.$.stock': -item.cantidad }
+                                }
+                            }
+                        }));
+
+                        if (bulkOps.length > 0) {
+                            await Producto.bulkWrite(bulkOps);
+                        }
+
+                        console.log(`🧹 Carrito vaciado y stock actualizado para usuario ${orden.usuario}`);
+                    }
+                } else {
+                    console.warn(`⚠️ No se encontró orden con id_preferencia ${idPreferencia}`);
+                }
+
+                return res.sendStatus(200);
+            } catch (error) {
+                console.error('❌ Error al procesar pago:', error.message);
+                return res.status(500).send('Error al procesar pago');
+            }
+        }
+
+        // 🔵 Otros casos no manejados
+        console.log('ℹ️ Webhook recibido pero no manejado:', { tipo, topic, action, idPago });
         res.sendStatus(200);
     } catch (error) {
-        console.error('❌ Error en webhook:', error.message);
+        console.error('❌ Error crítico en webhook:', error);
         res.sendStatus(500);
     }
 };
