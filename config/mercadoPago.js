@@ -1,7 +1,7 @@
-const { MercadoPagoConfig } = require('mercadopago');
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
-const mercadopago = new MercadoPagoConfig({
+const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN
 });
 
-module.exports = mercadopago;
+module.exports = client;
